@@ -1,129 +1,146 @@
-use anchor_lang::prelude::*;
-use playground::*;
+use anchor_lang::{prelude::*, system_program};
+use playground::Counter;
 use solana_program_test::*;
 use solana_sdk::{
-    account::Account,
-    signature::{Keypair, Signer},
-    transaction::Transaction,
+    account::Account, instruction::Instruction, signature::{Keypair, Signer}, transaction::Transaction
 };
+use anchor_lang::{InstructionData, ToAccountMetas};
+
 #[tokio::test]
 async fn test_initialize() {
-    let mut validator = ProgramTest::default();
-    let mut program = validator.add_program("playground", playground::ID, anchor_processor!(playground::entry));
+    let mut program = ProgramTest::new("playground", playground::ID, anchor_processor!(playground::entry));
+    let user = Keypair::new();
+    program.add_account(
+        user.pubkey(),
+        Account {
+            lamports: 1_000_000_000,
+            data: vec![],
+            owner: system_program::ID,
+            ..Account::default()
+        },
+    );
+        
+    let (mut banks_client, payer, recent_blockhash) = program.start().await;
 
-    // let (mut banks_client, payer, recent_blockhash) = program_test.start().await;
+    let counter_account = Keypair::new();
+    let counter_key = counter_account.pubkey();
 
-    // let counter = Keypair::new();
-    // let user = Keypair::new();
-    // program_test.add_account(s
-    //     user.pubkey(),
-    //     Account {
-    //         lamports: 1_000_000_000,
-    //         data: vec![],
-    //         owner: system_program::id(),
-    //         executable: false,
-    //         rent_epoch: 0,
-    //     },
-    // );
+        let ix = Instruction {
+            program_id: playground::ID,
+            accounts: playground::accounts::Initialize {
+                counter: counter_key,
+                user: payer.pubkey(),
+                system_program: solana_program::system_program::id(),
+            }
+            .to_account_metas(Some(true)),
+            data: playground::instruction::Initialize {}.data(),
+        };
 
-    // let ix = solana_sdk::instruction::Instruction {
-    //     program_id,
-    //     accounts: Initialize {
-    //         counter: counter,
-    //         user: user.pubkey(),
-    //         system_program: system_program::ID,
-    //     }
-    //     .to_account_metas(None),
-    //     data: simple_counter::instruction::Initialize {}.data(),
-    // };
+        let tx = Transaction::new_signed_with_payer(
+            &[ix],
+            Some(&payer.pubkey()),
+            &[&payer, &counter_account],
+            recent_blockhash,
+        );
 
-    // let transaction = Transaction::new_signed_with_payer(
-    //     &[ix],
-    //     Some(&payer.pubkey()),
-    //     &[&payer, &user, &counter],
-    //     recent_blockhash,
-    // );
+        let res = banks_client
+            .process_transaction(tx)
+            .await;
 
-    // banks_client.process_transaction(transaction).await.unwrap();
+        assert!(res.is_ok());
 
-    // let counter_account = banks_client
-    //     .get_account(counter.pubkey())
-    //     .await
-    //     .unwrap()
-    //     .unwrap();
 
-    // let counter_state = Counter::try_deserialize(&mut counter_account.data.as_ref()).unwrap();
+        let counter_res = banks_client
+        .get_account(counter_key)
+        .await
+        .unwrap()
+        .unwrap();
 
-    // assert_eq!(counter_state.count, 0);
+        let counter_state = Counter::try_deserialize(&mut counter_res.data.as_slice()).unwrap();
+        assert_eq!(counter_state.count, 0);
 }
 
-// #[tokio::test]
-// async fn test_increment() {
-//     let program_id = id();
-//     let mut program_test = ProgramTest::new("simple_counter", program_id, None);
+#[tokio::test]
+async fn test_increment() {
+    let mut program = ProgramTest::new("playground", playground::ID, anchor_processor!(playground::entry));
+    let user = Keypair::new();
+    program.add_account(
+        user.pubkey(),
+        Account {
+            lamports: 1_000_000_000,
+            data: vec![],
+            owner: system_program::ID,
+            ..Account::default()
+        },
+    );
+        
+    let (mut banks_client, payer, recent_blockhash) = program.start().await;
 
-//     let counter = Keypair::new();
-//     let user = Keypair::new();
-//     program_test.add_account(
-//         user.pubkey(),
-//         Account {
-//             lamports: 1_000_000_000,
-//             data: vec![],
-//             owner: system_program::id(),
-//             executable: false,
-//             rent_epoch: 0,
-//         },
-//     );
+    let counter_account = Keypair::new();
+    let counter_key = counter_account.pubkey();
 
-//     let (mut banks_client, payer, recent_blockhash) = program_test.start().await;
+        let ix = Instruction {
+            program_id: playground::ID,
+            accounts: playground::accounts::Initialize {
+                counter: counter_key,
+                user: payer.pubkey(),
+                system_program: solana_program::system_program::id(),
+            }
+            .to_account_metas(Some(true)),
+            data: playground::instruction::Initialize {}.data(),
+        };
 
-//     // Initialize the counter first
-//     let init_ix = solana_sdk::instruction::Instruction {
-//         program_id,
-//         accounts: Initialize {
-//             counter: counter.pubkey(),
-//             user: user.pubkey(),
-//             system_program: system_program::ID,
-//         }
-//         .to_account_metas(None),
-//         data: simple_counter::instruction::Initialize {}.data(),
-//     };
+        let tx = Transaction::new_signed_with_payer(
+            &[ix],
+            Some(&payer.pubkey()),
+            &[&payer, &counter_account],
+            recent_blockhash,
+        );
 
-//     let init_tx = Transaction::new_signed_with_payer(
-//         &[init_ix],
-//         Some(&payer.pubkey()),
-//         &[&payer, &user, &counter],
-//         recent_blockhash,
-//     );
+        let res = banks_client
+            .process_transaction(tx)
+            .await;
 
-//     banks_client.process_transaction(init_tx).await.unwrap();
+        assert!(res.is_ok());
 
-//     // Increment the counter
-//     let incr_ix = solana_sdk::instruction::Instruction {
-//         program_id,
-//         accounts: Increment {
-//             counter: counter.pubkey(),
-//         }
-//         .to_account_metas(None),
-//         data: simple_counter::instruction::Increment {}.data(),
-//     };
 
-//     let incr_tx = Transaction::new_signed_with_payer(
-//         &[incr_ix],
-//         Some(&payer.pubkey()),
-//         &[&payer],
-//         recent_blockhash,
-//     );
+        let counter_res = banks_client
+            .get_account(counter_key)
+            .await
+            .unwrap()
+            .unwrap();
 
-//     banks_client.process_transaction(incr_tx).await.unwrap();
+        let counter_state = Counter::try_deserialize(&mut counter_res.data.as_slice()).unwrap();
+        assert_eq!(counter_state.count, 0);
 
-//     let counter_account = banks_client
-//         .get_account(counter.pubkey())
-//         .await
-//         .unwrap()
-//         .unwrap();
+        let ix = Instruction {
+            program_id: playground::ID,
+            accounts: playground::accounts::Increment {
+                counter: counter_key,
+            }
+            .to_account_metas(Some(true)),
+            data: playground::instruction::Increment {}.data(),
+        };
 
-//     let counter_state = Counter::try_deserialize(&mut counter_account.data.as_ref()).unwrap();
+        let tx = Transaction::new_signed_with_payer(
+            &[ix],
+            Some(&payer.pubkey()),
+            &[&payer],
+            recent_blockhash,
+        );
 
-//     assert_eq!(counter_state.count, 1);
-// }
+        let res = banks_client
+            .process_transaction(tx)
+            .await;
+
+        assert!(res.is_ok());
+
+        let counter_res = banks_client
+            .get_account(counter_key)
+            .await
+            .unwrap()
+            .unwrap();
+
+        let counter_state = Counter::try_deserialize(&mut counter_res.data.as_slice()).unwrap();
+        assert_eq!(counter_state.count, 1);
+}
